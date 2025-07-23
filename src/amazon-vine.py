@@ -1,12 +1,14 @@
 import sys
 import re
 import time
+import logging
+import copy
 from typing import Set
 from typing_extensions import Final
 import urllib.request
 import urllib.error
 import urllib.parse
-import webbrowser
+# import webbrowser # This is now only used inside a function, can be moved for clarity
 import datetime
 import subprocess
 import http.cookiejar
@@ -20,11 +22,23 @@ import getpass
 from optparse import OptionParser
 
 
-INITIAL_PAGE: Final = 'https://www.amazon.com/gp/vine/'
-QUEUE_URL: Final = 'https://www.amazon.com/gp/vine/newsletter?ie=UTF8&tab=US_Default'
-VFA_URL: Final = 'https://www.amazon.com/gp/vine/newsletter?ie=UTF8&tab=US_LastChance'
+INITIAL_PAGE: Final = 'https://www.amazon.co.uk/vine/vine-items?queue=potluck'
+QUEUE_URL: Final = 'https://www.amazon.co.uk/vine/vine-items?queue=encore'
+AFA_URL: Final = 'https://www.amazon.co.uk/vine/vine-items?queue=last_chance'
 USER_AGENT: Final[str] = fake_useragent.UserAgent().ff
 
+def setup_logging():
+    """Configure logging to file and console."""
+    # Using basicConfig for simplicity. For more complex needs, you could
+    # create logger objects and add handlers manually.
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler("vine_monitor.log"),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
 
 def create_browser() -> mechanize.Browser:
     browser = mechanize.Browser()
@@ -32,8 +46,8 @@ def create_browser() -> mechanize.Browser:
 
     # Create a new cookie jar for Mechanize
     cj = http.cookiejar.CookieJar()
-    for cookie in firefox.get_cookies():
-        cj.set_cookie(cookie)
+    for cookie in firefox:
+        cj.set_cookie(copy.copy(cookie))
     browser.set_cookiejar(cj)
 
     # Necessary for Amazon.com
@@ -41,52 +55,52 @@ def create_browser() -> mechanize.Browser:
     browser.addheaders = [('User-agent', USER_AGENT)]
 
     try:
-        print('Connecting...')
+        logging.info('Connecting to Amazon Vine...')
         html = browser.open(INITIAL_PAGE).read()
 
         # Are we already logged in?
-        if b'The Exclusive Club of Influential Amazon Voices.' in html:
+        if b'Vine Help' in html:
+            logging.info("Successfully logged in with a browser cookie.")
             return browser
 
-        print('Could not log in with a cookie')
+        logging.critical('Could not log in with a cookie. Check browser session.')
         sys.exit(1)
     except urllib.error.HTTPError as e:
-        print(e)
+        logging.critical("HTTP Error during login: %s", e)
     except urllib.error.URLError as e:
-        print('URL Error', e)
+        logging.critical('URL Error during login: %s', e)
+    except Exception:
+        logging.critical("An unexpected error occurred during login.", exc_info=True)
 
     sys.exit(1)
 
 
 def download_vine_page(br, url, name=None):
     if name:
-        print(f"\nChecking {name}...")
+        logging.info("Checking %s...", name)
     try:
+        logging.debug("Downloading page: %s", url)
         response = br.open(url)
-    except:
+        html = response.read()
+        logging.debug("Parsing page...")
+        return bs4.BeautifulSoup(html, features="lxml")
+    except Exception as e:
+        logging.error("Failed to download or parse page %s: %s", url, e)
         return None
 
-    if name:
-        print('  Downloading...')
-
-    html = response.read()
-
-    if name:
-        print('  Parsing...')
-
-    return bs4.BeautifulSoup(html, features="lxml")
 
 
 def get_list(br, url, name) -> Set[str]:
     soup = download_vine_page(br, url, name)
     if not soup:
-        raise
+        logging.error("Could not get soup object for %s, returning empty list.", name)
+        return set()
 
     asins: Set[str] = set()
 
     for link in soup.find_all('tr', {'class': 'v_newsletter_item'}):
         if link['id'] in asins:
-            print('Duplicate in-stock item:', link['id'])
+            logging.warning('Duplicate in-stock item found in %s: %s', name, link['id'])
         asins.add(link['id'])
 
     # Find list of out-of-stock items.  All of items listed in the
@@ -103,16 +117,17 @@ def get_list(br, url, name) -> Set[str]:
                 # Remove all out-of-stock items from our list
                 asins.difference_update(oos)
 
-    print('Found %u items' % len(asins))
+    logging.info('Found %u in-stock items in %s.', len(asins), name)
     return asins
 
 
 def open_product_page(br, link, url) -> bool:
-    print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), end=' ')
+    import webbrowser
+    logging.debug("Attempting to open product page for ASIN: %s", link)
     soup = download_vine_page(br, url % link)
     # Make sure we don't get a 404 or some other error
     if soup:
-        print('New item:', link)
+        logging.info('New item found: %s', link)
         # Display how much tax it costs
         tags = soup.find_all('p', text=re.compile(
             'Estimated tax value : \$[0-9\.]*'))
@@ -121,12 +136,12 @@ def open_product_page(br, link, url) -> bool:
             m = re.search('\$([0-9\.]*)', tag)
             if m:
                 cost = float(m.group(1))
-                print('Tax cost: $%.2f' % cost)
+                logging.info('  Tax cost: $%.2f', cost)
         webbrowser.open_new_tab(url % link)
         time.sleep(1)
         return True
     else:
-        print('Invalid item:', link)
+        logging.warning('Invalid item page or error for ASIN: %s', link)
         return False
 
 
@@ -140,26 +155,31 @@ parser.add_option('--browser', dest='browser',
 
 (OPTIONS, _args) = parser.parse_args()
 
+setup_logging()
+logging.info("Vine Monitor starting up.")
+logging.info("Using browser: %s", OPTIONS.browser)
+logging.info("Check interval: %d minutes", OPTIONS.wait)
+
 BROWSER: Final = create_browser()
 
 your_queue_list = get_list(BROWSER, QUEUE_URL, "your queue")
-vine_for_all_list = get_list(BROWSER, VFA_URL, "Vine for All")
+vine_for_all_list = get_list(BROWSER, AFA_URL, "Available for all")
 
-if not vine_for_all_list:
-    print('Cannot get VfA list')
+if not your_queue_list and not vine_for_all_list:
+    logging.critical('Cannot get initial item lists. Exiting.')
     sys.exit(1)
 
 
 while True:
-    print("\nWaiting %u minute%s" %
-          (OPTIONS.wait, 's'[OPTIONS.wait == 1:]) + "\n")
+    logging.info("Waiting %u minute%s for the next check.",
+                 OPTIONS.wait, 's'[OPTIONS.wait == 1:])
     time.sleep(OPTIONS.wait * 60)
 
     your_queue_list2 = get_list(BROWSER, QUEUE_URL, "Your Queue")
     if your_queue_list2:
         for link in your_queue_list2.copy():
             if link not in your_queue_list:
-                if not open_product_page(BROWSER, link, 'https://www.amazon.com/gp/vine/product?ie=UTF8&asin=%s&tab=US_Default'):
+                if not open_product_page(BROWSER, link, 'https://www.amazon.co.uk/vine/vine-items?queue=potluck'):
                     # If the item can't be opened, it might be because the web site
                     # isn't ready to show it to me yet.  Remove it from our list so
                     # that it appears again as a new item, and we'll try again.
@@ -170,11 +190,11 @@ while True:
         # browser windows.
         your_queue_list = your_queue_list2
 
-    vine_for_all_list2 = get_list(BROWSER, VFA_URL, "Vine For All")
+    vine_for_all_list2 = get_list(BROWSER, AFA_URL, "Available for all")
     if vine_for_all_list2:
         for link in vine_for_all_list2.copy():
             if link not in vine_for_all_list:
-                if not open_product_page(BROWSER, link, 'https://www.amazon.com/gp/vine/product?ie=UTF8&asin=%s&tab=US_LastChance'):
+                if not open_product_page(BROWSER, link, 'https://www.amazon.co.uk/vine/vine-items?queue=last_chance'):
                     # If the item can't be opened, it might be because the web site
                     # isn't ready to show it to me yet.  Remove it from our list so
                     # that it appears again as a new item, and we'll try again.

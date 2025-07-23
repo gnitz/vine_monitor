@@ -1,0 +1,42 @@
+2025-07-21 22:52:37,395 - INFO - Vine Monitor starting up.
+2025-07-21 22:52:37,395 - INFO - Using browser: firefox
+2025-07-21 22:52:37,395 - INFO - Check interval: 10 minutes
+2025-07-21 22:52:37,417 - INFO - Connecting to Amazon Vine...
+2025-07-21 22:52:38,077 - CRITICAL - Could not log in with a cookie. Check browser session.
+2025-07-21 22:54:02,451 - INFO - Vine Monitor starting up.
+2025-07-21 22:54:02,451 - INFO - Using browser: firefox
+2025-07-21 22:54:02,451 - INFO - Check interval: 10 minutes
+2025-07-21 22:54:02,473 - INFO - Connecting to Amazon Vine...
+2025-07-21 22:54:02,844 - CRITICAL - Could not log in with a cookie. Check browser session.
+2025-07-21 22:55:08,768 - INFO - Vine Monitor starting up.
+2025-07-21 22:55:08,768 - INFO - Using browser: firefox
+2025-07-21 22:55:08,769 - INFO - Check interval: 10 minutes
+2025-07-21 22:55:08,789 - INFO - Connecting to Amazon Vine...
+2025-07-21 22:55:09,201 - CRITICAL - Could not log in with a cookie. Check browser session.
+2025-07-21 22:56:15,752 - INFO - Vine Monitor starting up.
+2025-07-21 22:56:15,752 - INFO - Using browser: firefox
+2025-07-21 22:56:15,752 - INFO - Check interval: 10 minutes
+2025-07-21 22:56:15,774 - INFO - Connecting to Amazon Vine...
+2025-07-21 22:56:16,160 - CRITICAL - Could not log in with a cookie. Check browser session.
+2025-07-21 22:57:28,837 - INFO - Vine Monitor starting up.
+2025-07-21 22:57:28,837 - INFO - Using browser: firefox
+2025-07-21 22:57:28,837 - INFO - Check interval: 10 minutes
+2025-07-21 22:57:28,857 - INFO - Connecting to Amazon Vine...
+2025-07-21 22:57:29,254 - INFO - Successfully logged in with a browser cookie.
+2025-07-21 22:57:29,255 - INFO - Checking your queue...
+2025-07-21 22:57:29,855 - ERROR - Failed to download or parse page https://www.amazon.co.uk/vine/vine-items?queue=encore: Couldn't find a tree builder with the features you requested: lxml. Do you need to install a parser library?
+2025-07-21 22:57:29,855 - ERROR - Could not get soup object for your queue, returning empty list.
+2025-07-21 22:57:29,856 - INFO - Checking Available for all...
+2025-07-21 22:57:30,194 - ERROR - Failed to download or parse page https://www.amazon.co.uk/vine/vine-items?queue=last_chance: Couldn't find a tree builder with the features you requested: lxml. Do you need to install a parser library?
+2025-07-21 22:57:30,194 - ERROR - Could not get soup object for Available for all, returning empty list.
+2025-07-21 22:57:30,194 - CRITICAL - Cannot get initial item lists. Exiting.
+2025-07-21 22:59:18,210 - INFO - Vine Monitor starting up.
+2025-07-21 22:59:18,210 - INFO - Using browser: firefox
+2025-07-21 22:59:18,210 - INFO - Check interval: 10 minutes
+2025-07-21 22:59:18,234 - INFO - Connecting to Amazon Vine...
+2025-07-21 22:59:18,610 - INFO - Successfully logged in with a browser cookie.
+2025-07-21 22:59:18,610 - INFO - Checking your queue...
+2025-07-21 22:59:19,247 - INFO - Found 0 in-stock items in your queue.
+2025-07-21 22:59:19,247 - INFO - Checking Available for all...
+2025-07-21 22:59:19,613 - INFO - Found 0 in-stock items in Available for all.
+2025-07-21 22:59:19,614 - CRITICAL - Cannot get initial item lists. Exiting.
