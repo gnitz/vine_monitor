@@ -10,10 +10,10 @@ load_dotenv()
 @dataclass(frozen=True)
 class Config:
     # URLs
-    INITIAL_PAGE: str = 'https://www.amazon.co.uk/vine/'
-    RFY_URL: str = 'https://www.amazon.co.uk/vine/vine-items?queue=potluck'
-    ADDITIONAL_ITEMS_URL: str = 'https://www.amazon.co.uk/vine/vine-items?queue=encore'
-    AFA_URL: str = 'https://www.amazon.co.uk/vine/vine-items?queue=last_chance'
+    INITIAL_PAGE: str = 'https://www.amazon.com/vine/'
+    RFY_URL: str = 'https://www.amazon.com/vine/vine-items?queue=potluck'
+    ADDITIONAL_ITEMS_URL: str = 'https://www.amazon.com/vine/vine-items?queue=encore'
+    AFA_URL: str = 'https://www.amazon.com/vine/vine-items?queue=last_chance'
     
     # Files 
     STATE_FILE: str = 'vine_monitor_state.json'

@@ -27,7 +27,13 @@ class VineClient:
         browser = mechanize.Browser()
         # Use the browser specified in config
         try:
-            firefox = getattr(browsercookie, config.BROWSER_TYPE)()
+            firefox_loader = browsercookie.Firefox(
+            cookie_files=[r"C:\Users\sowea\AppData\Roaming\Mozilla\Firefox\Profiles\vw8kfjla.default-release\cookies.sqlite"]
+            )
+            firefox = firefox_loader.load()
+            
+            # firefox = getattr(browsercookie, config.BROWSER_TYPE)()
+
         except AttributeError:
              logging.error(f"Browser type '{config.BROWSER_TYPE}' not supported by browsercookie. Defaulting to firefox.")
              firefox = browsercookie.firefox()
@@ -103,7 +109,7 @@ class VineClient:
             return None
 
         items: Set[VineItem] = set()
-        base_url = "https://www.amazon.co.uk"
+        base_url = "https://www.amazon.com"
 
         for tile in soup.select("div.vvp-item-tile"):
             asin_element = tile.select_one("input[data-asin]")
@@ -139,7 +145,7 @@ class VineClient:
                             search_words = title.split()[:3]
                             search_term = ' '.join(search_words)
                             q_url = (
-                                "https://www.amazon.co.uk/vine/vine-items?search=" +
+                                "https://www.amazon.com/vine/vine-items?search=" +
                                 urllib.parse.quote_plus(search_term)
                             )
                 else:
