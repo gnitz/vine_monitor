@@ -43,6 +43,29 @@
             background: #555;
         }
 
+        #searchWrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        #searchWrapper input {
+            padding-right: 22px;
+        }
+
+        #clearSearch {
+            position: absolute;
+            right: 6px;
+            cursor: pointer;
+            color: #aaa;
+            font-size: 16px;
+            user-select: none;
+        }
+
+        #clearSearch:hover {
+            color: #fff;
+        }
+
         #search {
             padding: 6px;
             border: none;
@@ -85,7 +108,10 @@
 <div id="header">
     <div>Vine Monitor Log</div>
     <div id="controls">
-        <input id="search" type="text" placeholder="Filter...">
+        <div id="searchWrapper">
+            <input id="search" type="text" placeholder="Filter...">
+            <span id="clearSearch">✕</span>
+        </div>
         <button id="highlightsOnly">Highlights Only</button>
         <button id="pause">Pause</button>
         <button id="refresh">Refresh</button>
@@ -99,43 +125,49 @@
     let refreshTimer = null;
     let highlightsOnly = false;
 
-    // 🔧 EASY-ACCESS CONSTANT FOR LINK SEARCH LENGTH
     const LINK_SEARCH_LENGTH = 20;
 
     const logBox = document.getElementById("log");
     const searchBox = document.getElementById("search");
 
 	function buildVineSearchLink(text) {
-		let trimmed = text.substring(0, LINK_SEARCH_LENGTH).trim();
+		// Remove "New ... Item:" prefix
+		let cleaned = text.replace(/^New\b.*?\bItem(s)?:\s*/i, "").trim();
 
-		// Ensure we don't cut off the last word
+		// Trim to search length
+		let trimmed = cleaned.substring(0, LINK_SEARCH_LENGTH).trim();
+
+		// Avoid cutting off mid‑word
 		if (trimmed.includes(" ")) {
 			trimmed = trimmed.substring(0, trimmed.lastIndexOf(" ")).trim();
+		}
+
+		return "https://www.amazon.com/vine/vine-items?search=" + encodeURIComponent(trimmed);
+	}
+    // Used ONLY for detection, NEVER for rendering
+    function stripPrefixes(line) {
+        return line
+            .replace(/^\s*\d{2}:\d{2}:\d{2},\d{3}\s*-\s*-\s*/, "")
+            .replace(/^\s*\d{4}-\d{2}-\d{2}.*?\s-\s*/, "")
+            .replace(/\b(INFO|WARNING|ERROR|CRITICAL)\b/g, "")
+            .replace(/^\s*[-:]+\s*/, "")
+            .trim();
     }
 
-    const encoded = encodeURIComponent(trimmed);
-    return `https://www.amazon.com/vine/vine-items?search=${encoded}`;
-}
     function applyColorCoding(line) {
-        const original = line;
+        const original = line;      // ALWAYS preserved
+        const stripped = stripPrefixes(line); // ONLY for detection
 
-        const isNoLine = /^\s*No\b/i.test(original);
+        // DETECTION
+        const isNoLine = /^No\b/i.test(stripped);
+        const isNewItem = /^New\b.*\bItem(s)?\b/i.test(stripped);
+        const isPriority = /^Priority match\b/i.test(stripped);
+        const isChecking = /^Checking\b/i.test(stripped);
+        const isFound = /^Found\b/i.test(stripped) && !stripped.includes("(Page");
+        const isErrorLine = stripped.includes("ERROR");
+        const isCritical = stripped.includes("CRITICAL");
 
-        const isNewItem =
-            !isNoLine &&
-            /\bNew\b.*\bItem(s)?\b/i.test(original);
-
-        const isPriority = original.includes("Priority match");
-
-        const isChecking = original.includes("Checking");
-
-        const isFound =
-            /\bFound\b.*\bItem(s)?\b/i.test(original);
-
-        const isErrorLine = original.includes("ERROR");
-
-        const isCritical = original.includes("CRITICAL");
-
+        // HIGHLIGHTS-ONLY FILTER
         if (highlightsOnly &&
             !isNewItem &&
             !isPriority &&
@@ -146,49 +178,46 @@
             return null;
         }
 
-        if (isNewItem || isPriority || isFound || isErrorLine || isNoLine || isCritical) {
-            line = line.replace(/^\s*\d{2}:\d{2}:\d{2},\d{3}\s*-\s*-\s*/g, "");
-            line = line.replace(/^\s*\d{4}-\d{2}-\d{2}.*?\s-\s*/g, "");
-            line = line.replace(/\b(INFO|WARNING|ERROR|CRITICAL)\b/g, "");
-            line = line.replace(/^\s*[-:]+\s*/, "");
-            line = line.replace(/New .* Item(s)?:\s*/i, "");
-        }
+        // RENDERING TEXT
+        let renderText = highlightsOnly ? stripped : original;
 
-        line = line.replace(/INFO/g, '<span class="info">INFO</span>');
-        line = line.replace(/WARNING/g, '<span class="warning">WARNING</span>');
-        line = line.replace(/ERROR/g, '<span class="error">ERROR</span>');
-        line = line.replace(/CRITICAL/g, '<span class="error">CRITICAL</span>');
+        // COLOR TAGS
+        renderText = renderText.replace(/INFO/g, '<span class="info">INFO</span>');
+        renderText = renderText.replace(/WARNING/g, '<span class="warning">WARNING</span>');
+        renderText = renderText.replace(/ERROR/g, '<span class="error">ERROR</span>');
+        renderText = renderText.replace(/CRITICAL/g, '<span class="error">CRITICAL</span>');
 
+        // RENDERING RULES
         if (isNoLine) {
-            return `<span class="error-line normal-line">${line}</span>`;
+            return `<span class="error-line normal-line">${renderText}</span>`;
         }
 
         if (isNewItem) {
-            const url = buildVineSearchLink(line);
-            return `<a href="${url}" target="_blank" class="new-item-line bullet">${line}</a>`;
+            const url = buildVineSearchLink(stripped);
+            return `<a href="${url}" target="_blank" class="new-item-line bullet">${renderText}</a>`;
         }
 
         if (isPriority) {
-            return `<span class="priority-line bullet">${line}</span>`;
+            return `<span class="priority-line bullet">${renderText}</span>`;
         }
 
         if (isChecking) {
-            return `<span class="checking-line normal-line">${line}</span>`;
+            return `<span class="checking-line normal-line">${renderText}</span>`;
         }
 
         if (isFound) {
-            return `<span class="found-line normal-line">${line}</span>`;
+            return `<span class="found-line normal-line">${renderText}</span>`;
         }
 
         if (isErrorLine) {
-            return `<span class="error-line normal-line">${line}</span>`;
+            return `<span class="error-line normal-line">${renderText}</span>`;
         }
 
         if (isCritical) {
-            return `<span class="error-line normal-line">${line}</span>`;
+            return `<span class="error-line normal-line">${renderText}</span>`;
         }
 
-        return `<span class="normal-line">${line}</span>`;
+        return `<span class="normal-line">${renderText}</span>`;
     }
 
     function filterLines(lines) {
@@ -251,6 +280,11 @@
     };
 
     searchBox.oninput = loadLog;
+
+    document.getElementById("clearSearch").onclick = () => {
+        searchBox.value = "";
+        loadLog();
+    };
 
     loadLog();
     startAutoRefresh();
