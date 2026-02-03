@@ -135,10 +135,10 @@ def check_and_update_queues(
                 logging.info("New RFY item: %s", item.title)
                 if config.DISCORD_WEBHOOK_RFY:
                     send_discord_notification(config.DISCORD_WEBHOOK_RFY, item, "Recommended for You")
-              #  if priority_terms and check_for_priority_match(item, priority_terms):
-               #     logging.info("Priority match for RFY item: %s", item.title)
-               #     if config.DISCORD_WEBHOOK_PRIORITY:
-               #         send_discord_notification(config.DISCORD_WEBHOOK_PRIORITY, item, "PRIORITY")
+                if priority_terms and check_for_priority_match(item, priority_terms):
+                    logging.info("Priority match for RFY item: %s", item.title)
+                    if config.DISCORD_WEBHOOK_PRIORITY:
+                        send_discord_notification(config.DISCORD_WEBHOOK_PRIORITY, item, "PRIORITY")
             rfy_list.update(new_items)
         else:
             logging.info("No new Recommended for You items.")

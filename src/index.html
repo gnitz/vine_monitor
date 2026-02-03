@@ -65,10 +65,6 @@
         .info { color: #4aa3ff; }
         .warning { color: #ffcc00; }
         .error { color: #ff6666; }
-		.error-line {
-			color: #ff4444;
-			font-weight: bold;
-		}
 
         .new-item-line {
             color: #66ff99;
@@ -77,7 +73,7 @@
         .priority-line {
             color: #ff66ff;
             font-weight: bold;
-            padding-left: 20px; /* indent priority lines */
+            padding-left: 20px;
         }
         .checking-line {
             color: #66aaff;
@@ -87,6 +83,10 @@
             color: #ffaa66;
             font-weight: bold;
         }
+        .error-line {
+            color: #ff4444;
+            font-weight: bold;
+        }
 
         /* Bullet style for New + Priority */
         .bullet::before {
@@ -94,11 +94,15 @@
             color: #888;
         }
 
-        /* Normal lines stay tight */
         .normal-line {
             display: inline;
-            margin: 0;
-            padding: 0;
+        }
+
+        a {
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
@@ -124,63 +128,75 @@
     const logBox = document.getElementById("log");
     const searchBox = document.getElementById("search");
 
-function applyColorCoding(line) {
-    const original = line;
-
-    const isNewItem = original.includes("New Additional Item");
-    const isPriority = original.includes("Priority match");
-    const isChecking = original.includes("Checking");
-    const isFound = original.includes("Found");
-    const isErrorLine = original.includes("ERROR");
-
-    // Skip non-highlight lines in highlight-only mode
-    if (highlightsOnly &&
-        !isNewItem &&
-        !isPriority &&
-        !isChecking &&
-        !isFound &&
-        !isErrorLine) {
-        return null;
+    function buildVineSearchLink(text) {
+        const trimmed = text.substring(0, 50).trim();
+        const encoded = encodeURIComponent(trimmed);
+        return `https://www.amazon.com/vine/vine-items?search=${encoded}`;
     }
 
-    // Clean highlighted lines
-    if (isNewItem || isPriority || isChecking || isFound || isErrorLine) {
-        line = line.replace(/^\s*\d{2}:\d{2}:\d{2},\d{3}\s*-\s*-\s*/g, "");
-        line = line.replace(/^\s*\d{4}-\d{2}-\d{2}.*?\s-\s*/g, "");
-        line = line.replace(/\b(INFO|WARNING|ERROR)\b/g, "");
-        line = line.replace(/^\s*[-:]+\s*/, "");
-        line = line.replace(/New Additional Item:\s*/g, "");
+    function applyColorCoding(line) {
+        const original = line;
+
+        const isNewItem = original.includes("New Additional Item");
+        const isPriority = original.includes("Priority match");
+        const isChecking = original.includes("Checking");
+        const isFound = original.includes("Found");
+        const isErrorLine = original.includes("ERROR");
+
+        // Skip non-highlight lines in highlight-only mode
+        if (highlightsOnly &&
+            !isNewItem &&
+            !isPriority &&
+            !isChecking &&
+            !isFound &&
+            !isErrorLine) {
+            return null;
+        }
+
+        // Clean highlighted lines
+        if (isNewItem || isPriority || isChecking || isFound || isErrorLine) {
+            line = line.replace(/^\s*\d{2}:\d{2}:\d{2},\d{3}\s*-\s*-\s*/g, "");
+            line = line.replace(/^\s*\d{4}-\d{2}-\d{2}.*?\s-\s*/g, "");
+            line = line.replace(/\b(INFO|WARNING|ERROR)\b/g, "");
+            line = line.replace(/^\s*[-:]+\s*/, "");
+            line = line.replace(/New Additional Item:\s*/g, "");
+        }
+
+        // Color coding for log levels (non-highlight lines)
+        line = line.replace(/INFO/g, '<span class="info">INFO</span>');
+        line = line.replace(/WARNING/g, '<span class="warning">WARNING</span>');
+        line = line.replace(/ERROR/g, '<span class="error">ERROR</span>');
+
+        // New Additional Item → bullet + link
+        if (isNewItem) {
+            const url = buildVineSearchLink(line);
+            return `<a href="${url}" target="_blank" class="new-item-line bullet">${line}</a>`;
+        }
+
+        // Priority → bullet + indent
+        if (isPriority) {
+            return `<span class="priority-line bullet">${line}</span>`;
+        }
+
+        // Checking → highlight only
+        if (isChecking) {
+            return `<span class="checking-line normal-line">${line}</span>`;
+        }
+
+        // Found → highlight only (NO LINK)
+        if (isFound) {
+            return `<span class="found-line normal-line">${line}</span>`;
+        }
+
+        // ERROR → full-line red
+        if (isErrorLine) {
+            return `<span class="error-line normal-line">${line}</span>`;
+        }
+
+        // Normal line
+        return `<span class="normal-line">${line}</span>`;
     }
 
-    // Color coding for log levels (non-highlight lines)
-    line = line.replace(/INFO/g, '<span class="info">INFO</span>');
-    line = line.replace(/WARNING/g, '<span class="warning">WARNING</span>');
-    line = line.replace(/ERROR/g, '<span class="error">ERROR</span>');
-
-    // Highlight entire line (text only)
-    if (isNewItem) {
-        return `<span class="new-item-line bullet">${line}</span>`;
-    }
-
-    if (isPriority) {
-        return `<span class="priority-line bullet">${line}</span>`;
-    }
-
-    if (isChecking) {
-        return `<span class="checking-line normal-line">${line}</span>`;
-    }
-
-    if (isFound) {
-        return `<span class="found-line normal-line">${line}</span>`;
-    }
-
-    if (isErrorLine) {
-        return `<span class="error-line normal-line">${line}</span>`;
-    }
-
-    // Normal line
-    return `<span class="normal-line">${line}</span>`;
-}
     function filterLines(lines) {
         const query = searchBox.value.toLowerCase();
         if (!query) return lines;
@@ -198,18 +214,14 @@ function applyColorCoding(line) {
             const text = await response.text();
             let lines = text.split("\n");
 
-            // Apply filter
             lines = filterLines(lines);
 
-            // Apply formatting
             const processed = lines
                 .map(applyColorCoding)
                 .filter(l => l !== null)
-                .join("\n");   // ← one newline per entry
+                .join("\n");
 
             logBox.innerHTML = processed;
-
-            // Auto-scroll
             logBox.scrollTop = logBox.scrollHeight;
 
         } catch (err) {
@@ -246,7 +258,6 @@ function applyColorCoding(line) {
 
     searchBox.oninput = loadLog;
 
-    // Initial load + auto-refresh
     loadLog();
     startAutoRefresh();
 </script>
