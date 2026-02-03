@@ -1,75 +1,240 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Vine Monitor Log Viewer</title>
+    <title>Vine Monitor Log</title>
     <style>
         body {
-            background-color: #111;
-            color: #eee;
             font-family: Consolas, monospace;
+            background: #1e1e1e;
+            color: #dcdcdc;
             margin: 0;
-            padding: 20px;
+            padding: 0;
         }
-        h1 {
-            margin-top: 0;
+
+        /* Fixed header */
+        #header {
+            background: #333;
+            padding: 10px 20px;
+            font-size: 20px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 10;
         }
+
+        #controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            background: #444;
+            color: #fff;
+            border: none;
+            padding: 6px 12px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #555;
+        }
+
+        #search {
+            padding: 6px;
+            border: none;
+            outline: none;
+            background: #2b2b2b;
+            color: #fff;
+        }
+
+        /* Log container */
         #log {
             white-space: pre-wrap;
-            background: #000;
-            padding: 15px;
-            border-radius: 8px;
-            height: 90vh;
+            padding: 20px;
             overflow-y: scroll;
-            font-size: 14px;
-            line-height: 1.4em;
+            height: calc(100vh - 60px);
+            margin-top: 60px;
         }
-        .new-item {
-            color: #66ff66;
+
+        /* Color coding */
+        .info { color: #4aa3ff; }
+        .warning { color: #ffcc00; }
+        .error { color: #ff6666; }
+
+        .new-item-line {
+            color: #66ff99;
             font-weight: bold;
         }
-        .priority {
+        .priority-line {
             color: #ff66ff;
             font-weight: bold;
         }
-        .error {
-            color: #ff4444;
+
+		.checking-line {
+			color: #66aaff;   /* light blue */
+			font-weight: bold;
+		}
+
+		.found-line {
+			color: #ffaa66;   /* orange */
+			font-weight: bold;
+		}
+    
+    /* Spacing only for highlighted lines */
+        .highlight-spaced {
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        /* Normal lines stay compact */
+        .normal-line {
+            display: block;
+            margin-bottom: 0;
         }
     </style>
 </head>
 <body>
 
-<h1>Vine Monitor Log Viewer</h1>
-<div id="log">Loading log...</div>
+<div id="header">
+    <div>Vine Monitor Log</div>
+    <div id="controls">
+        <input id="search" type="text" placeholder="Filter...">
+        <button id="highlightsOnly">Highlights Only</button>
+        <button id="pause">Pause</button>
+        <button id="refresh">Refresh</button>
+    </div>
+</div>
+
+<pre id="log">Loading...</pre>
 
 <script>
-async function updateLog() {
-    try {
-        const response = await fetch("/log");
-        const text = await response.text();
+    let autoRefresh = true;
+    let refreshTimer = null;
+    let highlightsOnly = false;
 
-        const lines = text.split("\n").map(line => {
-            if (line.includes("Priority match")) {
-                return `<span class="priority">${line}</span>`;
-            }
-            if (line.includes("New Additional Item")) {
-                return `<span class="new-item">${line}</span>`;
-            }
-            if (line.includes("ERROR") || line.includes("Exception")) {
-                return `<span class="error">${line}</span>`;
-            }
-            return line;
-        });
+    const logBox = document.getElementById("log");
+    const searchBox = document.getElementById("search");
 
-        document.getElementById("log").innerHTML = lines.join("<br>");
-    } catch (e) {
-        document.getElementById("log").innerHTML =
-            `<span class="error">Failed to load log: ${e}</span>`;
+    function applyColorCoding(line) {
+	
+        const original = line;
+
+        const isNewItem = original.includes("New Additional Item");
+        const isPriority = original.includes("Priority match");
+
+        // Skip non-highlight lines in highlight-only mode
+        if (highlightsOnly && !isNewItem && !isPriority) {
+            return null;
+        }
+
+		// Clean highlighted lines
+		if (isNewItem || isPriority) {
+			// Remove timestamps like "12:07:14,332 -  - "
+			line = line.replace(/^\s*\d{2}:\d{2}:\d{2},\d{3}\s*-\s*-\s*/g, "");
+
+			// Remove timestamps like "2025-01-01 12:34:56,123 - "
+			line = line.replace(/^\s*\d{4}-\d{2}-\d{2}.*?\s-\s*/g, "");
+
+			// Remove INFO/WARNING/ERROR tokens
+			line = line.replace(/\b(INFO|WARNING|ERROR)\b/g, "");
+
+			// Remove leftover punctuation
+			line = line.replace(/^\s*[-:]+\s*/, "");
+
+			// Remove "New Additional Item:" prefix
+			line = line.replace(/New Additional Item:\s*/g, "");
+		}
+        // Color coding for log levels (non-highlight lines)
+        line = line.replace(/INFO/g, '<span class="info">INFO</span>');
+        line = line.replace(/WARNING/g, '<span class="warning">WARNING</span>');
+        line = line.replace(/ERROR/g, '<span class="error">ERROR</span>');
+
+        // Highlight entire line (text only)
+        if (isNewItem) {
+            return `<span class="new-item-line highlight-spaced">${line}</span>`;
+        }
+
+        if (isPriority) {
+            return `<span class="priority-line highlight-spaced">${line}</span>`;
+        }
+
+        // Normal line (no extra spacing)
+        return `<span class="normal-line">${line}</span>`;
     }
-}
 
-setInterval(updateLog, 2000);
-updateLog();
+    function filterLines(lines) {
+        const query = searchBox.value.toLowerCase();
+        if (!query) return lines;
+        return lines.filter(line => line.toLowerCase().includes(query));
+    }
+
+    async function loadLog() {
+        try {
+            const response = await fetch("/log");
+            if (!response.ok) {
+                logBox.textContent = "Error loading log: " + response.statusText;
+                return;
+            }
+
+            const text = await response.text();
+            let lines = text.split("\n");
+
+            // Apply filter
+            lines = filterLines(lines);
+
+            // Apply formatting
+           const processed = lines
+			.map(applyColorCoding)
+			.filter(l => l !== null)
+			.join("");   // ← no newlines added
+
+            logBox.innerHTML = processed;
+
+            // Auto-scroll
+            logBox.scrollTop = logBox.scrollHeight;
+
+        } catch (err) {
+            logBox.textContent = "Error fetching log: " + err;
+        }
+    }
+
+    function startAutoRefresh() {
+        if (refreshTimer) clearInterval(refreshTimer);
+        refreshTimer = setInterval(loadLog, 3000);
+    }
+
+    document.getElementById("refresh").onclick = loadLog;
+
+    document.getElementById("pause").onclick = () => {
+        autoRefresh = !autoRefresh;
+        const btn = document.getElementById("pause");
+
+        if (autoRefresh) {
+            btn.textContent = "Pause";
+            startAutoRefresh();
+        } else {
+            btn.textContent = "Resume";
+            clearInterval(refreshTimer);
+        }
+    };
+
+    document.getElementById("highlightsOnly").onclick = () => {
+        highlightsOnly = !highlightsOnly;
+        document.getElementById("highlightsOnly").textContent =
+            highlightsOnly ? "Show All" : "Highlights Only";
+        loadLog();
+    };
+
+    searchBox.oninput = loadLog;
+
+    // Initial load + auto-refresh
+    loadLog();
+    startAutoRefresh();
 </script>
 
 </body>
