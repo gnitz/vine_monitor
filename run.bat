@@ -9,7 +9,7 @@ set LOGFILE=%WORKDIR%\vine_monitor.log
 
 echo Working directory: %WORKDIR%
 echo Log file: %LOGFILE%
-
+read
 :: If first arg is --reset (case-insensitive), truncate the log
 if /I "%1"=="--reset" (
     echo Clearing %LOGFILE%
@@ -19,9 +19,9 @@ if /I "%1"=="--reset" (
         type nul > "%LOGFILE%"
     )
 )
-
+read
 :: Tab 1 — server.py
-::wt -w 0 nt --startingDirectory "%WORKDIR%" powershell -NoExit -Command "python src\server.py"
-
+wt -w 0 nt --startingDirectory "%WORKDIR%" powershell -NoExit -Command "python src\server.py"
+read
 :: Tab 2 — amazon-vine.py
 wt -w 0 nt --startingDirectory "%WORKDIR%" powershell -NoExit -Command "python src\amazon-vine.py"

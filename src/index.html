@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Vine Monitor Log Viewer</title>
+    <style>
+        body {
+            background-color: #111;
+            color: #eee;
+            font-family: Consolas, monospace;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            margin-top: 0;
+        }
+        #log {
+            white-space: pre-wrap;
+            background: #000;
+            padding: 15px;
+            border-radius: 8px;
+            height: 90vh;
+            overflow-y: scroll;
+            font-size: 14px;
+            line-height: 1.4em;
+        }
+        .new-item {
+            color: #66ff66;
+            font-weight: bold;
+        }
+        .priority {
+            color: #ff66ff;
+            font-weight: bold;
+        }
+        .error {
+            color: #ff4444;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Vine Monitor Log Viewer</h1>
+<div id="log">Loading log...</div>
+
+<script>
+async function updateLog() {
+    try {
+        const response = await fetch("/log");
+        const text = await response.text();
+
+        const lines = text.split("\n").map(line => {
+            if (line.includes("Priority match")) {
+                return `<span class="priority">${line}</span>`;
+            }
+            if (line.includes("New Additional Item")) {
+                return `<span class="new-item">${line}</span>`;
+            }
+            if (line.includes("ERROR") || line.includes("Exception")) {
+                return `<span class="error">${line}</span>`;
+            }
+            return line;
+        });
+
+        document.getElementById("log").innerHTML = lines.join("<br>");
+    } catch (e) {
+        document.getElementById("log").innerHTML =
+            `<span class="error">Failed to load log: ${e}</span>`;
+    }
+}
+
+setInterval(updateLog, 2000);
+updateLog();
+</script>
+
+</body>
+</html>
