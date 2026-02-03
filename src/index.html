@@ -73,28 +73,28 @@
         .priority-line {
             color: #ff66ff;
             font-weight: bold;
+            padding-left: 20px; /* indent priority lines */
+        }
+        .checking-line {
+            color: #66aaff;
+            font-weight: bold;
+        }
+        .found-line {
+            color: #ffaa66;
+            font-weight: bold;
         }
 
-		.checking-line {
-			color: #66aaff;   /* light blue */
-			font-weight: bold;
-		}
-
-		.found-line {
-			color: #ffaa66;   /* orange */
-			font-weight: bold;
-		}
-    
-    /* Spacing only for highlighted lines */
-        .highlight-spaced {
-            margin-bottom: 12px;
-            display: block;
+        /* Bullet style for New + Priority */
+        .bullet::before {
+            content: "• ";
+            color: #888;
         }
 
-        /* Normal lines stay compact */
+        /* Normal lines stay tight */
         .normal-line {
-            display: block;
-            margin-bottom: 0;
+            display: inline;
+            margin: 0;
+            padding: 0;
         }
     </style>
 </head>
@@ -121,34 +121,27 @@
     const searchBox = document.getElementById("search");
 
     function applyColorCoding(line) {
-	
         const original = line;
 
         const isNewItem = original.includes("New Additional Item");
         const isPriority = original.includes("Priority match");
+        const isChecking = original.includes("Checking");
+        const isFound = original.includes("Found");
 
         // Skip non-highlight lines in highlight-only mode
-        if (highlightsOnly && !isNewItem && !isPriority) {
+        if (highlightsOnly && !isNewItem && !isPriority && !isChecking && !isFound) {
             return null;
         }
 
-		// Clean highlighted lines
-		if (isNewItem || isPriority) {
-			// Remove timestamps like "12:07:14,332 -  - "
-			line = line.replace(/^\s*\d{2}:\d{2}:\d{2},\d{3}\s*-\s*-\s*/g, "");
+        // Clean highlighted lines
+        if (isNewItem || isPriority || isChecking || isFound) {
+            line = line.replace(/^\s*\d{2}:\d{2}:\d{2},\d{3}\s*-\s*-\s*/g, "");
+            line = line.replace(/^\s*\d{4}-\d{2}-\d{2}.*?\s-\s*/g, "");
+            line = line.replace(/\b(INFO|WARNING|ERROR)\b/g, "");
+            line = line.replace(/^\s*[-:]+\s*/, "");
+            line = line.replace(/New Additional Item:\s*/g, "");
+        }
 
-			// Remove timestamps like "2025-01-01 12:34:56,123 - "
-			line = line.replace(/^\s*\d{4}-\d{2}-\d{2}.*?\s-\s*/g, "");
-
-			// Remove INFO/WARNING/ERROR tokens
-			line = line.replace(/\b(INFO|WARNING|ERROR)\b/g, "");
-
-			// Remove leftover punctuation
-			line = line.replace(/^\s*[-:]+\s*/, "");
-
-			// Remove "New Additional Item:" prefix
-			line = line.replace(/New Additional Item:\s*/g, "");
-		}
         // Color coding for log levels (non-highlight lines)
         line = line.replace(/INFO/g, '<span class="info">INFO</span>');
         line = line.replace(/WARNING/g, '<span class="warning">WARNING</span>');
@@ -156,11 +149,19 @@
 
         // Highlight entire line (text only)
         if (isNewItem) {
-            return `<span class="new-item-line highlight-spaced">${line}</span>`;
+            return `<span class="new-item-line bullet">${line}</span>`;
         }
 
         if (isPriority) {
-            return `<span class="priority-line highlight-spaced">${line}</span>`;
+            return `<span class="priority-line bullet">${line}</span>`;
+        }
+
+        if (isChecking) {
+            return `<span class="checking-line normal-line">${line}</span>`;
+        }
+
+        if (isFound) {
+            return `<span class="found-line normal-line">${line}</span>`;
         }
 
         // Normal line (no extra spacing)
@@ -188,10 +189,10 @@
             lines = filterLines(lines);
 
             // Apply formatting
-           const processed = lines
-			.map(applyColorCoding)
-			.filter(l => l !== null)
-			.join("");   // ← no newlines added
+            const processed = lines
+                .map(applyColorCoding)
+                .filter(l => l !== null)
+                .join("\n");   // ← one newline per entry
 
             logBox.innerHTML = processed;
 
