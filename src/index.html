@@ -12,7 +12,6 @@
             padding: 0;
         }
 
-        /* Fixed header */
         #header {
             background: #333;
             padding: 10px 20px;
@@ -52,7 +51,6 @@
             color: #fff;
         }
 
-        /* Log container */
         #log {
             white-space: pre-wrap;
             padding: 20px;
@@ -61,49 +59,25 @@
             margin-top: 60px;
         }
 
-        /* Color coding */
         .info { color: #4aa3ff; }
         .warning { color: #ffcc00; }
         .error { color: #ff6666; }
 
-        .new-item-line {
-            color: #66ff99;
-            font-weight: bold;
-        }
-        .priority-line {
-            color: #ff66ff;
-            font-weight: bold;
-            padding-left: 20px;
-        }
-        .checking-line {
-            color: #66aaff;
-            font-weight: bold;
-        }
-        .found-line {
-            color: #ffaa66;
-            font-weight: bold;
-        }
-        .error-line {
-            color: #ff4444;
-            font-weight: bold;
-        }
+        .new-item-line { color: #66ff99; font-weight: bold; }
+        .priority-line { color: #ff66ff; font-weight: bold; padding-left: 20px; }
+        .checking-line { color: #66aaff; font-weight: bold; }
+        .found-line { color: #ffaa66; font-weight: bold; }
+        .error-line { color: #ff4444; font-weight: bold; }
 
-        /* Bullet style for New + Priority */
         .bullet::before {
-            content: "• ";
+            content: " • ";
             color: #888;
         }
 
-        .normal-line {
-            display: inline;
-        }
+        .normal-line { display: inline; }
 
-        a {
-            text-decoration: none;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
+        a { text-decoration: none; }
+        a:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -125,75 +99,95 @@
     let refreshTimer = null;
     let highlightsOnly = false;
 
+    // 🔧 EASY-ACCESS CONSTANT FOR LINK SEARCH LENGTH
+    const LINK_SEARCH_LENGTH = 20;
+
     const logBox = document.getElementById("log");
     const searchBox = document.getElementById("search");
 
-    function buildVineSearchLink(text) {
-        const trimmed = text.substring(0, 50).trim();
-        const encoded = encodeURIComponent(trimmed);
-        return `https://www.amazon.com/vine/vine-items?search=${encoded}`;
+	function buildVineSearchLink(text) {
+		let trimmed = text.substring(0, LINK_SEARCH_LENGTH).trim();
+
+		// Ensure we don't cut off the last word
+		if (trimmed.includes(" ")) {
+			trimmed = trimmed.substring(0, trimmed.lastIndexOf(" ")).trim();
     }
 
+    const encoded = encodeURIComponent(trimmed);
+    return `https://www.amazon.com/vine/vine-items?search=${encoded}`;
+}
     function applyColorCoding(line) {
         const original = line;
 
-        const isNewItem = original.includes("New Additional Item");
+        const isNoLine = /^\s*No\b/i.test(original);
+
+        const isNewItem =
+            !isNoLine &&
+            /\bNew\b.*\bItem(s)?\b/i.test(original);
+
         const isPriority = original.includes("Priority match");
+
         const isChecking = original.includes("Checking");
-        const isFound = original.includes("Found");
+
+        const isFound =
+            /\bFound\b.*\bItem(s)?\b/i.test(original);
+
         const isErrorLine = original.includes("ERROR");
 
-        // Skip non-highlight lines in highlight-only mode
+        const isCritical = original.includes("CRITICAL");
+
         if (highlightsOnly &&
             !isNewItem &&
             !isPriority &&
-            !isChecking &&
             !isFound &&
-            !isErrorLine) {
+            !isErrorLine &&
+            !isNoLine &&
+            !isCritical) {
             return null;
         }
 
-        // Clean highlighted lines
-        if (isNewItem || isPriority || isChecking || isFound || isErrorLine) {
+        if (isNewItem || isPriority || isFound || isErrorLine || isNoLine || isCritical) {
             line = line.replace(/^\s*\d{2}:\d{2}:\d{2},\d{3}\s*-\s*-\s*/g, "");
             line = line.replace(/^\s*\d{4}-\d{2}-\d{2}.*?\s-\s*/g, "");
-            line = line.replace(/\b(INFO|WARNING|ERROR)\b/g, "");
+            line = line.replace(/\b(INFO|WARNING|ERROR|CRITICAL)\b/g, "");
             line = line.replace(/^\s*[-:]+\s*/, "");
-            line = line.replace(/New Additional Item:\s*/g, "");
+            line = line.replace(/New .* Item(s)?:\s*/i, "");
         }
 
-        // Color coding for log levels (non-highlight lines)
         line = line.replace(/INFO/g, '<span class="info">INFO</span>');
         line = line.replace(/WARNING/g, '<span class="warning">WARNING</span>');
         line = line.replace(/ERROR/g, '<span class="error">ERROR</span>');
+        line = line.replace(/CRITICAL/g, '<span class="error">CRITICAL</span>');
 
-        // New Additional Item → bullet + link
+        if (isNoLine) {
+            return `<span class="error-line normal-line">${line}</span>`;
+        }
+
         if (isNewItem) {
             const url = buildVineSearchLink(line);
             return `<a href="${url}" target="_blank" class="new-item-line bullet">${line}</a>`;
         }
 
-        // Priority → bullet + indent
         if (isPriority) {
             return `<span class="priority-line bullet">${line}</span>`;
         }
 
-        // Checking → highlight only
         if (isChecking) {
             return `<span class="checking-line normal-line">${line}</span>`;
         }
 
-        // Found → highlight only (NO LINK)
         if (isFound) {
             return `<span class="found-line normal-line">${line}</span>`;
         }
 
-        // ERROR → full-line red
         if (isErrorLine) {
             return `<span class="error-line normal-line">${line}</span>`;
         }
 
-        // Normal line
+        if (isCritical) {
+            return `<span class="error-line normal-line">${line}</span>`;
+        }
+
         return `<span class="normal-line">${line}</span>`;
     }
 
