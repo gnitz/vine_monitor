@@ -90,7 +90,7 @@ def check_for_priority_match(item: VineItem, priority_terms: Set[str]) -> bool:
 
         # Check if all words in the priority phrase are present in the title
         if phrase_words.issubset(item_title_words):
-            logging.info("Priority match found for '%s' on words from '%s'", item.title, phrase)
+            # logging.info("Priority match found for '%s' on words from '%s'", item.title, phrase)
             return True
     return False
 

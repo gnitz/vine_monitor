@@ -108,11 +108,16 @@
 <div id="header">
     <div>Vine Monitor Log</div>
     <div id="controls">
+		<label style="display:flex;align-items:center;gap:5px;color:#fff;">
+			<input type="checkbox" id="notifyPriority">
+		Priority Notifications
+		</label>
         <div id="searchWrapper">
             <input id="search" type="text" placeholder="Filter...">
             <span id="clearSearch">✕</span>
         </div>
         <button id="highlightsOnly">Highlights Only</button>
+        <button id="priorityOnly">Priority Only</button>
         <button id="pause">Pause</button>
         <button id="refresh">Refresh</button>
     </div>
@@ -124,27 +129,36 @@
     let autoRefresh = true;
     let refreshTimer = null;
     let highlightsOnly = false;
+    let priorityOnly = false;
+	let seenPriorityItems = new Set();
 
     const LINK_SEARCH_LENGTH = 20;
 
     const logBox = document.getElementById("log");
     const searchBox = document.getElementById("search");
 
-	function buildVineSearchLink(text) {
-		// Remove "New ... Item:" prefix
-		let cleaned = text.replace(/^New\b.*?\bItem(s)?:\s*/i, "").trim();
+	function showToast(message) {
+		const toast = document.getElementById("toast");
+		toast.textContent = message;
+		toast.style.display = "block";
 
-		// Trim to search length
-		let trimmed = cleaned.substring(0, LINK_SEARCH_LENGTH).trim();
-
-		// Avoid cutting off mid‑word
-		if (trimmed.includes(" ")) {
-			trimmed = trimmed.substring(0, trimmed.lastIndexOf(" ")).trim();
-		}
-
-		return "https://www.amazon.com/vine/vine-items?search=" + encodeURIComponent(trimmed);
+		setTimeout(() => {
+			toast.style.display = "none";
+		}, 4000);
 	}
-    // Used ONLY for detection, NEVER for rendering
+
+    function buildVineSearchLink(text) {
+        // Remove "New ... Item:" prefix
+        let cleaned = text.replace(/^New\b.*?\bItem(s)?:\s*/i, "").trim();
+
+        let trimmed = cleaned.substring(0, LINK_SEARCH_LENGTH).trim();
+        if (trimmed.includes(" ")) {
+            trimmed = trimmed.substring(0, trimmed.lastIndexOf(" ")).trim();
+        }
+        return "https://www.amazon.com/vine/vine-items?search=" + encodeURIComponent(trimmed);
+    }
+
+    // Used ONLY for detection
     function stripPrefixes(line) {
         return line
             .replace(/^\s*\d{2}:\d{2}:\d{2},\d{3}\s*-\s*-\s*/, "")
@@ -155,8 +169,8 @@
     }
 
     function applyColorCoding(line) {
-        const original = line;      // ALWAYS preserved
-        const stripped = stripPrefixes(line); // ONLY for detection
+        const original = line;      
+        const stripped = stripPrefixes(line);
 
         // DETECTION
         const isNoLine = /^No\b/i.test(stripped);
@@ -166,6 +180,23 @@
         const isFound = /^Found\b/i.test(stripped) && !stripped.includes("(Page");
         const isErrorLine = stripped.includes("ERROR");
         const isCritical = stripped.includes("CRITICAL");
+		// Detect new priority items for notifications
+		if (isPriority) {
+			const key = stripped; // stripped contains the clean text
+
+			if (!seenPriorityItems.has(key)) {
+				seenPriorityItems.add(key);
+
+				// Only notify if checkbox is enabled
+				if (document.getElementById("notifyPriority").checked) {
+					showToast("New Priority Item Found!");
+				}
+			}
+		}
+        // PRIORITY-ONLY FILTER
+        if (priorityOnly && !isPriority) {
+            return null;
+        }
 
         // HIGHLIGHTS-ONLY FILTER
         if (highlightsOnly &&
@@ -274,8 +305,29 @@
 
     document.getElementById("highlightsOnly").onclick = () => {
         highlightsOnly = !highlightsOnly;
+
+        if (highlightsOnly) {
+            priorityOnly = false;
+            document.getElementById("priorityOnly").textContent = "Priority Only";
+        }
+
         document.getElementById("highlightsOnly").textContent =
             highlightsOnly ? "Show All" : "Highlights Only";
+
+        loadLog();
+    };
+
+    document.getElementById("priorityOnly").onclick = () => {
+        priorityOnly = !priorityOnly;
+
+        if (priorityOnly) {
+            highlightsOnly = false;
+            document.getElementById("highlightsOnly").textContent = "Highlights Only";
+        }
+
+        document.getElementById("priorityOnly").textContent =
+            priorityOnly ? "Show All" : "Priority Only";
+
         loadLog();
     };
 
@@ -289,6 +341,11 @@
     loadLog();
     startAutoRefresh();
 </script>
-
+<div id="toast" 
+     style="position:fixed;bottom:20px;right:20px;
+            background:#ff66ff;color:#000;padding:12px 18px;
+            border-radius:6px;font-weight:bold;
+            display:none;z-index:9999;">
+</div>
 </body>
 </html>
